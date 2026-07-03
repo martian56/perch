@@ -1,0 +1,35 @@
+import std/string
+import std/test { assert_eq_str }
+import "./ansi" { move_to, clear_screen, clear_line, cursor_hide, cursor_show, sgr, sgr_reset }
+
+fun test_move_to() {
+    assert_eq_str(move_to(1, 1), "\u{1b}[1;1H")
+    assert_eq_str(move_to(24, 80), "\u{1b}[24;80H")
+}
+
+fun test_clear() {
+    assert_eq_str(clear_screen(), "\u{1b}[2J")
+    assert_eq_str(clear_line(), "\u{1b}[2K")
+}
+
+fun test_cursor_visibility() {
+    assert_eq_str(cursor_hide(), "\u{1b}[?25l")
+    assert_eq_str(cursor_show(), "\u{1b}[?25h")
+}
+
+fun test_sgr_single_code() {
+    assert_eq_str(sgr([31]), "\u{1b}[31m")
+}
+
+fun test_sgr_many_codes() {
+    assert_eq_str(sgr([1, 4, 32]), "\u{1b}[1;4;32m")
+}
+
+fun test_sgr_empty_is_empty() {
+    let none: List<Int> = []
+    assert_eq_str(sgr(none), "")
+}
+
+fun test_sgr_reset() {
+    assert_eq_str(sgr_reset(), "\u{1b}[0m")
+}

@@ -1,0 +1,61 @@
+// ANSI escape sequence builders. Pure string construction; write the result
+// through Terminal.write or any other output path.
+
+import std/string
+
+// Move the cursor to a 1-based row and column.
+fun move_to(row: Int, col: Int) -> String {
+    return "\u{1b}[${row};${col}H"
+}
+
+fun clear_screen() -> String {
+    return "\u{1b}[2J"
+}
+
+fun clear_line() -> String {
+    return "\u{1b}[2K"
+}
+
+fun cursor_hide() -> String {
+    return "\u{1b}[?25l"
+}
+
+fun cursor_show() -> String {
+    return "\u{1b}[?25h"
+}
+
+fun alt_screen_on() -> String {
+    return "\u{1b}[?1049h"
+}
+
+fun alt_screen_off() -> String {
+    return "\u{1b}[?1049l"
+}
+
+// Button-event tracking plus SGR coordinates, the widely supported pair.
+fun mouse_on() -> String {
+    return "\u{1b}[?1002h\u{1b}[?1006h"
+}
+
+fun mouse_off() -> String {
+    return "\u{1b}[?1006l\u{1b}[?1002l"
+}
+
+// A Select Graphic Rendition sequence from raw code numbers, so callers can
+// compose styles without depending on any particular style type.
+fun sgr(codes: List<Int>) -> String {
+    if codes.len() == 0 {
+        return ""
+    }
+    let body = "${codes[0]}"
+    let i = 1
+    while i < codes.len() {
+        body = "${body};${codes[i]}"
+        i = i + 1
+    }
+    return "\u{1b}[${body}m"
+}
+
+fun sgr_reset() -> String {
+    return "\u{1b}[0m"
+}

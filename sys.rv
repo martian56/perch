@@ -1,0 +1,62 @@
+// Bindings for c/shim.c. This is the only module that declares the extern
+// symbols; everything else goes through these wrappers.
+
+import std/string
+import std/ffi { to_cstr, free_cstr, from_cstr }
+
+extern "C" {
+    fun rp_raw_enable() -> Int
+    fun rp_raw_disable() -> Int
+    fun rp_cols() -> Int
+    fun rp_rows() -> Int
+    fun rp_read_byte(timeout_ms: Int) -> Int
+    fun rp_write(s: CStr)
+    fun rp_flush()
+    fun rp_byte_str(b: Int) -> CStr
+}
+
+// Result values of read_byte, mirrored from the shim.
+const READ_TIMEOUT: Int = -1
+const READ_CLOSED: Int = -2
+
+fun raw_enable() -> Bool {
+    return rp_raw_enable() == 0
+}
+
+fun raw_disable() -> Bool {
+    return rp_raw_disable() == 0
+}
+
+// Terminal width in columns, or -1 when stdout is not a terminal.
+fun term_cols() -> Int {
+    return rp_cols()
+}
+
+// Terminal height in rows, or -1 when stdout is not a terminal.
+fun term_rows() -> Int {
+    return rp_rows()
+}
+
+// One byte from stdin: the byte value, READ_TIMEOUT, or READ_CLOSED.
+// A negative timeout blocks until input arrives.
+fun read_byte(timeout_ms: Int) -> Int {
+    return rp_read_byte(timeout_ms)
+}
+
+// Write straight to the terminal, bypassing print's line buffering.
+fun term_write(s: String) {
+    let p = to_cstr(s)
+    rp_write(p)
+    free_cstr(p)
+}
+
+fun term_flush() {
+    rp_flush()
+}
+
+// The byte value as a one-byte string. Concatenating these rebuilds any
+// UTF-8 sequence, since Raven strings are byte oriented.
+fun byte_str(b: Int) -> String {
+    // The shim buffer is static; from_cstr copies it, so no free here.
+    return from_cstr(rp_byte_str(b))
+}

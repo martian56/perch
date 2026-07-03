@@ -1,0 +1,9 @@
+[package]
+name = "perch"
+version = "0.1.0"
+edition = "v2"
+
+[dependencies]
+
+[ffi]
+sources = ["c/shim.c"]

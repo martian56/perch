@@ -1,0 +1,326 @@
+// Incremental decoder for the terminal input byte stream. Feed it one byte
+// at a time; it answers with a finished event or asks for more. The caller
+// owns timing: when a read times out mid-sequence, call flush to settle a
+// pending lone ESC. Keeping the decoder free of I/O makes it testable by
+// feeding byte lists.
+
+import std/string
+import "./keys" { Key, MouseKind, MouseEvent, InputEvent }
+import "./sys" { byte_str }
+
+// What feed reports after each byte.
+enum Step {
+    Ready(InputEvent),
+    More,
+}
+
+struct Parser {
+    buf: List<Int>,
+}
+
+impl Parser {
+    fun new() -> Parser {
+        let b: List<Int> = []
+        return Parser { buf: b }
+    }
+
+    fun feed(self, b: Int) -> Step {
+        if self.buf.len() == 0 {
+            return self._start(b)
+        }
+        if self.buf[0] == 27 {
+            return self._escape(b)
+        }
+        return self._utf8(b)
+    }
+
+    // Settle a pending sequence after a read timeout. A lone ESC is the Esc
+    // key; any other partial sequence is dropped.
+    fun flush(self) -> InputEvent {
+        let lone_esc = self.buf.len() == 1 && self.buf[0] == 27
+        self._clear()
+        if lone_esc {
+            return InputEvent.KeyPress(Key.Esc)
+        }
+        return InputEvent.Idle
+    }
+
+    fun _clear(self) {
+        let empty: List<Int> = []
+        self.buf = empty
+    }
+
+    // First byte of a new sequence.
+    fun _start(self, b: Int) -> Step {
+        if b == 27 {
+            self.buf.push(b)
+            return Step.More
+        }
+        if b == 13 || b == 10 {
+            return Step.Ready(InputEvent.KeyPress(Key.Enter))
+        }
+        if b == 9 {
+            return Step.Ready(InputEvent.KeyPress(Key.Tab))
+        }
+        if b == 127 || b == 8 {
+            return Step.Ready(InputEvent.KeyPress(Key.Backspace))
+        }
+        if b >= 1 && b <= 26 {
+            return Step.Ready(InputEvent.KeyPress(Key.Ctrl(byte_str(b + 96))))
+        }
+        if b < 32 {
+            return Step.More
+        }
+        if b < 128 {
+            return Step.Ready(InputEvent.KeyPress(Key.Char(byte_str(b))))
+        }
+        if b >= 194 && b <= 244 {
+            self.buf.push(b)
+            return Step.More
+        }
+        // A stray continuation byte carries nothing on its own.
+        return Step.More
+    }
+
+    // Byte after an ESC.
+    fun _escape(self, b: Int) -> Step {
+        if self.buf.len() == 1 {
+            if b == 91 || b == 79 {
+                self.buf.push(b)
+                return Step.More
+            }
+            // Alt+key or a stray ESC before a plain byte: decode the byte
+            // on its own.
+            self._clear()
+            return self.feed(b)
+        }
+        if self.buf[1] == 91 {
+            return self._csi(b)
+        }
+        return self._ss3(b)
+    }
+
+    // CSI sequence: ESC [ params final.
+    fun _csi(self, b: Int) -> Step {
+        if b >= 64 && b <= 126 {
+            let params = self._params()
+            self._clear()
+            return Step.Ready(_decode_csi(params, b))
+        }
+        if b >= 32 && b <= 63 {
+            self.buf.push(b)
+            return Step.More
+        }
+        self._clear()
+        return Step.More
+    }
+
+    // SS3 sequence: ESC O final. F1 to F4 and some navigation keys.
+    fun _ss3(self, b: Int) -> Step {
+        self._clear()
+        if b == 80 {
+            return Step.Ready(InputEvent.KeyPress(Key.F(1)))
+        }
+        if b == 81 {
+            return Step.Ready(InputEvent.KeyPress(Key.F(2)))
+        }
+        if b == 82 {
+            return Step.Ready(InputEvent.KeyPress(Key.F(3)))
+        }
+        if b == 83 {
+            return Step.Ready(InputEvent.KeyPress(Key.F(4)))
+        }
+        if b == 65 {
+            return Step.Ready(InputEvent.KeyPress(Key.Up))
+        }
+        if b == 66 {
+            return Step.Ready(InputEvent.KeyPress(Key.Down))
+        }
+        if b == 67 {
+            return Step.Ready(InputEvent.KeyPress(Key.Right))
+        }
+        if b == 68 {
+            return Step.Ready(InputEvent.KeyPress(Key.Left))
+        }
+        if b == 72 {
+            return Step.Ready(InputEvent.KeyPress(Key.Home))
+        }
+        if b == 70 {
+            return Step.Ready(InputEvent.KeyPress(Key.End))
+        }
+        return Step.Ready(InputEvent.Idle)
+    }
+
+    // Continuation of a UTF-8 character.
+    fun _utf8(self, b: Int) -> Step {
+        if b < 128 || b >= 192 {
+            // Not a continuation byte; drop the broken lead and start over.
+            self._clear()
+            return self.feed(b)
+        }
+        self.buf.push(b)
+        if self.buf.len() < _utf8_len(self.buf[0]) {
+            return Step.More
+        }
+        let s = ""
+        let i = 0
+        while i < self.buf.len() {
+            s = s.concat(byte_str(self.buf[i]))
+            i = i + 1
+        }
+        self._clear()
+        return Step.Ready(InputEvent.KeyPress(Key.Char(s)))
+    }
+
+    // The parameter bytes collected so far, without the ESC [ prefix.
+    fun _params(self) -> List<Int> {
+        let out: List<Int> = []
+        let i = 2
+        while i < self.buf.len() {
+            out.push(self.buf[i])
+            i = i + 1
+        }
+        return out
+    }
+}
+
+// Total bytes in a UTF-8 character with this lead byte.
+fun _utf8_len(lead: Int) -> Int {
+    if lead < 224 {
+        return 2
+    }
+    if lead < 240 {
+        return 3
+    }
+    return 4
+}
+
+// Decode a complete CSI sequence from its parameter bytes and final byte.
+// Modifier parameters (as in ESC [ 1 ; 5 A for Ctrl+Up) are accepted and
+// ignored; the base key comes through.
+fun _decode_csi(params: List<Int>, last: Int) -> InputEvent {
+    if params.len() > 0 && params[0] == 60 {
+        return _decode_mouse(params, last)
+    }
+    if last == 65 {
+        return InputEvent.KeyPress(Key.Up)
+    }
+    if last == 66 {
+        return InputEvent.KeyPress(Key.Down)
+    }
+    if last == 67 {
+        return InputEvent.KeyPress(Key.Right)
+    }
+    if last == 68 {
+        return InputEvent.KeyPress(Key.Left)
+    }
+    if last == 72 {
+        return InputEvent.KeyPress(Key.Home)
+    }
+    if last == 70 {
+        return InputEvent.KeyPress(Key.End)
+    }
+    if last == 90 {
+        // Shift+Tab reports as plain Tab for now.
+        return InputEvent.KeyPress(Key.Tab)
+    }
+    if last == 126 {
+        return _decode_tilde(_numbers(params))
+    }
+    return InputEvent.Idle
+}
+
+// The numbers in a parameter byte run, split on semicolons. Non-digit bytes
+// such as the SGR mouse marker are skipped.
+fun _numbers(params: List<Int>) -> List<Int> {
+    let out: List<Int> = []
+    let cur = 0
+    let seen = false
+    let i = 0
+    while i < params.len() {
+        let b = params[i]
+        if b >= 48 && b <= 57 {
+            cur = cur * 10 + (b - 48)
+            seen = true
+        }
+        if b == 59 {
+            out.push(cur)
+            cur = 0
+            seen = false
+        }
+        i = i + 1
+    }
+    if seen {
+        out.push(cur)
+    }
+    return out
+}
+
+// ESC [ n ~ navigation and function keys.
+fun _decode_tilde(nums: List<Int>) -> InputEvent {
+    if nums.len() == 0 {
+        return InputEvent.Idle
+    }
+    let n = nums[0]
+    if n == 1 || n == 7 {
+        return InputEvent.KeyPress(Key.Home)
+    }
+    if n == 2 {
+        return InputEvent.KeyPress(Key.Insert)
+    }
+    if n == 3 {
+        return InputEvent.KeyPress(Key.Delete)
+    }
+    if n == 4 || n == 8 {
+        return InputEvent.KeyPress(Key.End)
+    }
+    if n == 5 {
+        return InputEvent.KeyPress(Key.PageUp)
+    }
+    if n == 6 {
+        return InputEvent.KeyPress(Key.PageDown)
+    }
+    if n >= 11 && n <= 15 {
+        return InputEvent.KeyPress(Key.F(n - 10))
+    }
+    if n >= 17 && n <= 21 {
+        return InputEvent.KeyPress(Key.F(n - 11))
+    }
+    if n == 23 || n == 24 {
+        return InputEvent.KeyPress(Key.F(n - 12))
+    }
+    return InputEvent.Idle
+}
+
+// SGR mouse report: ESC [ < code ; x ; y then M for press, m for release.
+fun _decode_mouse(params: List<Int>, last: Int) -> InputEvent {
+    let nums = _numbers(params)
+    if nums.len() < 3 {
+        return InputEvent.Idle
+    }
+    let code = nums[0]
+    let x = nums[1]
+    let y = nums[2]
+    if code >= 64 && code < 96 {
+        let kind = MouseKind.ScrollUp
+        if code % 2 == 1 {
+            kind = MouseKind.ScrollDown
+        }
+        return InputEvent.Mouse(MouseEvent { kind, button: -1, x, y })
+    }
+    let btn = code & 3
+    let moving = (code & 32) != 0
+    if moving {
+        if btn == 3 {
+            return InputEvent.Mouse(MouseEvent { kind: MouseKind.Move, button: -1, x, y })
+        }
+        return InputEvent.Mouse(MouseEvent { kind: MouseKind.Drag, button: btn, x, y })
+    }
+    if btn == 3 {
+        return InputEvent.Idle
+    }
+    if last == 109 {
+        return InputEvent.Mouse(MouseEvent { kind: MouseKind.Up, button: btn, x, y })
+    }
+    return InputEvent.Mouse(MouseEvent { kind: MouseKind.Down, button: btn, x, y })
+}

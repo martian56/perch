@@ -1,0 +1,86 @@
+// Run with: rvpm run
+// Interactive: shows each decoded event until q, Esc, or Ctrl+C.
+import std/io { println }
+import std/string
+import "../lib" { Terminal, Size }
+import "../keys" { InputEvent, Key, MouseEvent, MouseKind }
+
+fun describe_key(k: Key) -> String {
+    return match k {
+        Char(c) -> "char '${c}'",
+        Enter -> "enter",
+        Tab -> "tab",
+        Backspace -> "backspace",
+        Esc -> "esc",
+        Up -> "up",
+        Down -> "down",
+        Left -> "left",
+        Right -> "right",
+        Home -> "home",
+        End -> "end",
+        PageUp -> "page up",
+        PageDown -> "page down",
+        Insert -> "insert",
+        Delete -> "delete",
+        F(n) -> "F${n}",
+        Ctrl(c) -> "ctrl+${c}",
+    }
+}
+
+fun describe_mouse(m: MouseEvent) -> String {
+    let kind = match m.kind {
+        Down -> "down",
+        Up -> "up",
+        Drag -> "drag",
+        Move -> "move",
+        ScrollUp -> "scroll up",
+        ScrollDown -> "scroll down",
+    }
+    return "mouse ${kind}, button ${m.button}, at ${m.x},${m.y}"
+}
+
+fun main() {
+    let t = Terminal.new()
+    let sz = t.size()
+    println("terminal is ${sz.w}x${sz.h}")
+    if !t.raw_on() {
+        println("stdin is not a terminal, nothing to demo")
+        return
+    }
+    t.mouse_on()
+    t.write("raw mode on: press keys or click, q or esc quits\r\n")
+    let running = true
+    while running {
+        let e = t.read_event(250)
+        match e {
+            KeyPress(k) -> {
+                t.write("${describe_key(k)}\r\n")
+                match k {
+                    Char(c) -> {
+                        if c == "q" {
+                            running = false
+                        }
+                    },
+                    Esc -> {
+                        running = false
+                    },
+                    Ctrl(c) -> {
+                        if c == "c" {
+                            running = false
+                        }
+                    },
+                    _ -> {},
+                }
+            },
+            Mouse(m) -> {
+                t.write("${describe_mouse(m)}\r\n")
+            },
+            Idle -> {},
+            Closed -> {
+                running = false
+            },
+        }
+    }
+    t.restore()
+    println("bye")
+}

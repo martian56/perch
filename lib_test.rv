@@ -1,0 +1,25 @@
+import std/test { assert_true, assert_false }
+import "./lib" { Terminal, Size }
+
+fun test_new_terminal_starts_clean() {
+    let t = Terminal.new()
+    assert_false(t.raw)
+    assert_false(t.alt)
+    assert_false(t.mouse)
+}
+
+fun test_size_is_always_positive() {
+    // A real terminal reports its dimensions; anything else falls back to
+    // 80x24. Either way the numbers are usable.
+    let t = Terminal.new()
+    let s = t.size()
+    assert_true(s.w > 0)
+    assert_true(s.h > 0)
+}
+
+fun test_write_and_flush_do_not_fail() {
+    let t = Terminal.new()
+    t.write("")
+    t.flush()
+    assert_true(true)
+}

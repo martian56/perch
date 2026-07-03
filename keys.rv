@@ -1,0 +1,51 @@
+// Input event types. These are plain data: the decoding that produces them
+// lives in input.rv, the reading loop in lib.rv.
+
+// A single key press.
+enum Key {
+    Char(String),
+    Enter,
+    Tab,
+    Backspace,
+    Esc,
+    Up,
+    Down,
+    Left,
+    Right,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    Insert,
+    Delete,
+    F(Int),
+    Ctrl(String),
+}
+
+// What the mouse did.
+enum MouseKind {
+    Down,
+    Up,
+    Drag,
+    Move,
+    ScrollUp,
+    ScrollDown,
+}
+
+// A mouse event at a 1-based cell position. Button is 0 for left, 1 for
+// middle, 2 for right, and -1 when no button applies.
+struct MouseEvent {
+    kind: MouseKind,
+    button: Int,
+    x: Int,
+    y: Int,
+}
+
+// What read_event hands back. Idle means the timeout passed with nothing
+// decoded; Closed means stdin ended.
+enum InputEvent {
+    KeyPress(Key),
+    Mouse(MouseEvent),
+    Idle,
+    Closed,
+}
