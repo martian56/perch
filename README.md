@@ -1,5 +1,7 @@
 # perch
 
+[![CI](https://github.com/martian56/perch/actions/workflows/ci.yml/badge.svg)](https://github.com/martian56/perch/actions/workflows/ci.yml)
+
 Raw terminal control for Raven. Keypresses as they happen, mouse reports,
 terminal size, and unbuffered writes, on Linux, macOS, and Windows.
 
@@ -23,7 +25,7 @@ the same one Raven already needs for linking.
 
 ## Usage
 
-```raven
+```rust
 import "github.com/martian56/perch" { Terminal }
 import "github.com/martian56/perch/keys" { InputEvent, Key }
 
