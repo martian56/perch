@@ -48,6 +48,7 @@ fun main() {
         return
     }
     t.mouse_on()
+    t.paste_on()
     t.write("raw mode on: press keys or click, q or esc quits\r\n")
     let running = true
     while running {
@@ -74,6 +75,9 @@ fun main() {
             },
             Mouse(m) -> {
                 t.write("${describe_mouse(m)}\r\n")
+            },
+            Paste(s) -> {
+                t.write("paste (${s.length()} bytes)\r\n")
             },
             Idle -> {},
             Closed -> {

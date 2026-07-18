@@ -42,10 +42,13 @@ struct MouseEvent {
 }
 
 // What read_event hands back. Idle means the timeout passed with nothing
-// decoded; Closed means stdin ended.
+// decoded; Closed means stdin ended. Paste is one whole bracketed paste,
+// newlines normalized to \n, so a pasted block arrives as a single event
+// instead of a stream of keys (and its newlines cannot submit early).
 enum InputEvent {
     KeyPress(Key),
     Mouse(MouseEvent),
+    Paste(String),
     Idle,
     Closed,
 }

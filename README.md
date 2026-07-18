@@ -70,6 +70,10 @@ fun main() {
 - `Mouse(MouseEvent)`: kind (`Down`, `Up`, `Drag`, `Move`, `ScrollUp`,
   `ScrollDown`), button, and a 1-based cell position. Call `mouse_on()`
   first.
+- `Paste(String)`: one whole bracketed paste, newlines normalized to
+  `\n`, so pasted text arrives as a single event instead of a stream of
+  keystrokes (and a pasted newline cannot act as Enter). Call
+  `paste_on()` first.
 - `Idle`: the timeout passed without input. This is what makes render
   loops tick.
 - `Closed`: stdin ended.
@@ -85,6 +89,7 @@ as `Ctrl("c")` like any other key: quitting is your program's decision.
   when stdin is not a terminal, so piped runs can bail out cleanly.
 - `alt_on() / alt_off()`: the alternate screen; scrollback survives.
 - `mouse_on() / mouse_off()`: SGR mouse reporting.
+- `paste_on() / paste_off()`: bracketed paste, delivered as `Paste` events.
 - `size() -> Size`: terminal width and height in cells, 80x24 fallback.
 - `write(s) / flush()`: straight to the terminal, no line buffering.
 - `read_event(timeout_ms) -> InputEvent`: see above.

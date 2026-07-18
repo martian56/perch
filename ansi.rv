@@ -41,6 +41,16 @@ fun mouse_off() -> String {
     return "\u{1b}[?1006l\u{1b}[?1002l"
 }
 
+// Bracketed paste: the terminal wraps pasted text in ESC[200~ .. ESC[201~
+// instead of replaying it as keystrokes.
+fun paste_on() -> String {
+    return "\u{1b}[?2004h"
+}
+
+fun paste_off() -> String {
+    return "\u{1b}[?2004l"
+}
+
 // A Select Graphic Rendition sequence from raw code numbers, so callers can
 // compose styles without depending on any particular style type.
 fun sgr(codes: List<Int>) -> String {
