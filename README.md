@@ -16,7 +16,7 @@ useful on its own for menus, key-driven tools, and progress displays.
 
 ```toml
 [dependencies]
-"github.com/martian56/perch" = "v0.1.0"
+"github.com/martian56/perch" = "v0.2.0"
 ```
 
 The package bundles a small C shim (termios and poll on POSIX, the console
@@ -83,6 +83,21 @@ A negative timeout blocks until something arrives.
 In raw mode nothing is echoed and nothing is line buffered. Ctrl+C arrives
 as `Ctrl("c")` like any other key: quitting is your program's decision.
 
+Handling a paste looks like handling any other event:
+
+```rust
+t.paste_on()
+match t.read_event(100) {
+    Paste(text) -> {
+        // One event for the whole paste. text may span many lines; a
+        // pasted newline is content here, never an Enter keypress.
+        editor.insert(text)
+    },
+    KeyPress(k) -> handle_key(k),
+    _ -> {},
+}
+```
+
 ## The Terminal type
 
 - `raw_on() / raw_off()`: enter and leave raw mode. `raw_on` returns false
@@ -99,6 +114,22 @@ as `Ctrl("c")` like any other key: quitting is your program's decision.
 
 `perch/ansi` has the escape builders (`move_to`, `clear_screen`,
 `cursor_hide`, `sgr`, and friends) when you want to compose output by hand.
+
+## Module map
+
+Everything is importable on its own; `Terminal` is just the convenient
+bundle on top.
+
+- `perch` (lib.rv): `Terminal` and `Size`, the reading loop, mode tracking.
+- `perch/keys`: the event and key types (`InputEvent`, `Key`, `MouseEvent`,
+  `MouseKind`). Plain data, no I/O.
+- `perch/input`: `Parser`, the incremental byte decoder behind
+  `read_event`. Feed it bytes yourself to decode input from somewhere other
+  than stdin, or to unit-test key handling; the whole decoder test suite
+  works this way, no terminal involved.
+- `perch/ansi`: escape sequence builders, pure string construction.
+- `perch/sys`: the thin wrappers over the C shim (raw mode, size, byte
+  reads, writes). You normally never import this directly.
 
 ## Demo
 
