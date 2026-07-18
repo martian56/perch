@@ -16,15 +16,25 @@ enum Step {
 
 struct Parser {
     buf: List<Int>,
+    // Bracketed paste: between ESC[200~ and ESC[201~ every byte is content,
+    // collected in `paste`; `tail` holds a partial match of the terminator.
+    pasting: Bool,
+    paste: List<Int>,
+    tail: List<Int>,
 }
 
 impl Parser {
     fun new() -> Parser {
         let b: List<Int> = []
-        return Parser { buf: b }
+        let p: List<Int> = []
+        let t: List<Int> = []
+        return Parser { buf: b, pasting: false, paste: p, tail: t }
     }
 
     fun feed(self, b: Int) -> Step {
+        if self.pasting {
+            return self._paste_feed(b)
+        }
         if self.buf.len() == 0 {
             return self._start(b)
         }
@@ -35,14 +45,74 @@ impl Parser {
     }
 
     // Settle a pending sequence after a read timeout. A lone ESC is the Esc
-    // key; any other partial sequence is dropped.
+    // key; any other partial sequence is dropped. Mid-paste, nothing settles:
+    // a large paste can span reads, so the content keeps accumulating until
+    // the terminator arrives.
     fun flush(self) -> InputEvent {
+        if self.pasting {
+            return InputEvent.Idle
+        }
         let lone_esc = self.buf.len() == 1 && self.buf[0] == 27
         self._clear()
         if lone_esc {
             return InputEvent.KeyPress(Key.Esc)
         }
         return InputEvent.Idle
+    }
+
+    // One byte of paste content. The terminator ESC [ 2 0 1 ~ is matched
+    // incrementally through `tail`; on a mismatch the held bytes were real
+    // content, so they move into the paste before the byte is reconsidered.
+    fun _paste_feed(self, b: Int) -> Step {
+        let expected = _paste_end()
+        if b == expected[self.tail.len()] {
+            self.tail.push(b)
+            if self.tail.len() == expected.len() {
+                return Step.Ready(self._paste_done())
+            }
+            return Step.More
+        }
+        let held = self.tail
+        let fresh: List<Int> = []
+        self.tail = fresh
+        let i = 0
+        while i < held.len() {
+            self.paste.push(held[i])
+            i = i + 1
+        }
+        // The mismatched byte may itself start a terminator (its first byte
+        // cannot appear later inside one, so a single re-check suffices).
+        if b == expected[0] {
+            self.tail.push(b)
+            return Step.More
+        }
+        self.paste.push(b)
+        return Step.More
+    }
+
+    // The finished paste as one event, newlines normalized: terminals send
+    // \r (or \r\n) for line breaks in pasted text.
+    fun _paste_done(self) -> InputEvent {
+        let s = ""
+        let i = 0
+        while i < self.paste.len() {
+            let b = self.paste[i]
+            if b == 13 {
+                s = s.concat("\n")
+                if i + 1 < self.paste.len() && self.paste[i + 1] == 10 {
+                    i = i + 1
+                }
+            } else {
+                s = s.concat(byte_str(b))
+            }
+            i = i + 1
+        }
+        self.pasting = false
+        let p: List<Int> = []
+        self.paste = p
+        let t: List<Int> = []
+        self.tail = t
+        return InputEvent.Paste(s)
     }
 
     fun _clear(self) {
@@ -105,6 +175,18 @@ impl Parser {
         if b >= 64 && b <= 126 {
             let params = self._params()
             self._clear()
+            if b == 126 {
+                let nums = _numbers(params)
+                if nums.len() > 0 && nums[0] == 200 {
+                    // Paste start: everything until ESC[201~ is content.
+                    self.pasting = true
+                    return Step.More
+                }
+                if nums.len() > 0 && nums[0] == 201 {
+                    // A stray paste end with no start; ignore it.
+                    return Step.More
+                }
+            }
             return Step.Ready(_decode_csi(params, b))
         }
         if b >= 32 && b <= 63 {
@@ -182,6 +264,11 @@ impl Parser {
         }
         return out
     }
+}
+
+// The paste terminator byte sequence: ESC [ 2 0 1 ~.
+fun _paste_end() -> List<Int> {
+    return [27, 91, 50, 48, 49, 126]
 }
 
 // Total bytes in a UTF-8 character with this lead byte.

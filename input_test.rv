@@ -27,6 +27,7 @@ fun event_tag(e: InputEvent) -> String {
     return match e {
         KeyPress(k) -> "key ${key_tag(k)}",
         Mouse(m) -> "mouse ${mouse_tag(m)}",
+        Paste(s) -> "paste:${s}",
         Idle -> "idle",
         Closed -> "closed",
     }
@@ -197,4 +198,50 @@ fun test_parser_reuse_across_events() {
     assert_eq_str(event_tag(feed_all(p, [27, 91, 65])), "key up")
     assert_eq_str(event_tag(feed_all(p, [98])), "key char:b")
     assert_eq_str(event_tag(feed_all(p, [27, 91, 60, 48, 59, 49, 59, 49, 77])), "mouse down b0 1,1")
+}
+
+// Bracketed paste: ESC[200~ starts, ESC[201~ ends, everything between is
+// content delivered as one Paste event.
+fun test_paste_arrives_as_one_event() {
+    // ESC[200~ h i ESC[201~
+    let bytes = [27, 91, 50, 48, 48, 126, 104, 105, 27, 91, 50, 48, 49, 126]
+    assert_eq_str(decode(bytes), "paste:hi")
+}
+
+fun test_paste_newlines_normalize_and_do_not_submit() {
+    // "a" CR "b" pastes as a\nb: the CR is content, not the Enter key.
+    let bytes = [27, 91, 50, 48, 48, 126, 97, 13, 98, 27, 91, 50, 48, 49, 126]
+    assert_eq_str(decode(bytes), "paste:a\nb")
+    // CRLF collapses to one newline.
+    let crlf = [27, 91, 50, 48, 48, 126, 97, 13, 10, 98, 27, 91, 50, 48, 49, 126]
+    assert_eq_str(decode(crlf), "paste:a\nb")
+}
+
+fun test_paste_keeps_a_partial_terminator_as_content() {
+    // An ESC then z inside the content: the held ESC flushes back into the
+    // paste when the match fails.
+    let bytes = [27, 91, 50, 48, 48, 126, 97, 27, 122, 98, 27, 91, 50, 48, 49, 126]
+    assert_eq_str(decode(bytes), "paste:a\u{1b}zb")
+}
+
+fun test_paste_carries_utf8_content() {
+    // é is 195 169.
+    let bytes = [27, 91, 50, 48, 48, 126, 195, 169, 27, 91, 50, 48, 49, 126]
+    assert_eq_str(decode(bytes), "paste:é")
+}
+
+fun test_paste_survives_a_flush_between_reads() {
+    let p = Parser.new()
+    let head = [27, 91, 50, 48, 48, 126, 104, 105]
+    assert_eq_str(event_tag(feed_all(p, head)), "idle")
+    // A read timeout mid-paste settles nothing and keeps the content.
+    assert_eq_str(event_tag(p.flush()), "idle")
+    let tail = [33, 27, 91, 50, 48, 49, 126]
+    assert_eq_str(event_tag(feed_all(p, tail)), "paste:hi!")
+}
+
+fun test_stray_paste_end_is_ignored() {
+    let p = Parser.new()
+    assert_eq_str(event_tag(feed_all(p, [27, 91, 50, 48, 49, 126])), "idle")
+    assert_eq_str(event_tag(feed_all(p, [113])), "key char:q")
 }

@@ -44,11 +44,12 @@ struct Terminal {
     raw: Bool,
     alt: Bool,
     mouse: Bool,
+    paste: Bool,
 }
 
 impl Terminal {
     fun new() -> Terminal {
-        return Terminal { parser: Parser.new(), raw: false, alt: false, mouse: false }
+        return Terminal { parser: Parser.new(), raw: false, alt: false, mouse: false, paste: false }
     }
 
     // Switch raw mode on. False when stdin is not a terminal, which is the
@@ -88,6 +89,18 @@ impl Terminal {
     fun mouse_off(self) {
         self.write(ansi.mouse_off())
         self.mouse = false
+    }
+
+    // Bracketed paste: pasted text arrives as one Paste event instead of a
+    // stream of keystrokes.
+    fun paste_on(self) {
+        self.write(ansi.paste_on())
+        self.paste = true
+    }
+
+    fun paste_off(self) {
+        self.write(ansi.paste_off())
+        self.paste = false
     }
 
     // Current size, with an 80x24 fallback when stdout is not a terminal.
@@ -159,6 +172,9 @@ impl Terminal {
 
     // Undo whatever setup and mouse_on switched on, in the right order.
     fun restore(self) {
+        if self.paste {
+            self.paste_off()
+        }
         if self.mouse {
             self.mouse_off()
         }
