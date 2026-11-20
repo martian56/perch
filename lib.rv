@@ -1,7 +1,7 @@
 // perch: raw terminal control for interactive programs.
 //
-//     import "github.com/martian56/perch" { Terminal }
-//     import "github.com/martian56/perch/keys" { InputEvent, Key }
+//     from "github.com/martian56/perch" import Terminal
+//     from "github.com/martian56/perch/keys" import InputEvent, Key
 //
 //     let t = Terminal.new()
 //     if t.raw_on() {
@@ -25,36 +25,36 @@
 // program's decision. The event decoding lives in input.rv, the ANSI
 // builders in ansi.rv, and the C shim under c/.
 
-import std/string
-import "./sys" { raw_enable, raw_disable, term_cols, term_rows, read_byte, term_write, term_flush }
-import "./keys" { InputEvent, Key }
-import "./input" { Parser, Step }
+import std.string
+from "./sys" import raw_enable, raw_disable, term_cols, term_rows, read_byte, term_write, term_flush
+from "./keys" import InputEvent, Key
+from "./input" import Parser, Step
 import "./ansi" as ansi
 
 // Terminal size in cells.
-struct Size {
-    w: Int,
-    h: Int,
+class Size {
+    w: int
+    h: int
 }
 
 // A handle on the interactive terminal. It tracks which modes it switched
 // on, so restore can put everything back.
-struct Terminal {
-    parser: Parser,
-    raw: Bool,
-    alt: Bool,
-    mouse: Bool,
-    paste: Bool,
+class Terminal {
+    parser: Parser
+    raw: bool
+    alt: bool
+    mouse: bool
+    paste: bool
 }
 
 impl Terminal {
     fun new() -> Terminal {
-        return Terminal { parser: Parser.new(), raw: false, alt: false, mouse: false, paste: false }
+        return Terminal(parser: Parser.new(), raw: false, alt: false, mouse: false, paste: false)
     }
 
     // Switch raw mode on. False when stdin is not a terminal, which is the
     // signal to skip interactive behavior entirely.
-    fun raw_on(self) -> Bool {
+    fun raw_on(self) -> bool {
         if raw_enable() {
             self.raw = true
             return true
@@ -107,15 +107,15 @@ impl Terminal {
     fun size(self) -> Size {
         let w = term_cols()
         let h = term_rows()
-        if w <= 0 || h <= 0 {
-            return Size { w: 80, h: 24 }
+        if w <= 0 or h <= 0 {
+            return Size(w: 80, h: 24)
         }
-        return Size { w, h }
+        return Size(w: w, h: h)
     }
 
     // Write straight to the terminal. Unlike print, this is not line
     // buffered, so partial lines and escape sequences land immediately.
-    fun write(self, s: String) {
+    fun write(self, s: str) {
         term_write(s)
     }
 
@@ -128,7 +128,7 @@ impl Terminal {
     // Closed means stdin ended. Bytes that belong to one escape sequence
     // arrive back to back, so once a sequence starts the follow-up reads
     // use a short private timeout; a lone ESC settles as the Esc key.
-    fun read_event(self, timeout_ms: Int) -> InputEvent {
+    fun read_event(self, timeout_ms: int) -> InputEvent {
         let b = read_byte(timeout_ms)
         if b == -2 {
             return InputEvent.Closed
@@ -136,13 +136,13 @@ impl Terminal {
         if b == -1 {
             return InputEvent.Idle
         }
-        let step = self.parser.feed(b)
+        var step = self.parser.feed(b)
         while true {
             match step {
-                Ready(e) -> {
+                case Ready(e) {
                     return e
-                },
-                More -> {
+                }
+                case More {
                     let nb = read_byte(6)
                     if nb == -2 {
                         return InputEvent.Closed
@@ -151,7 +151,7 @@ impl Terminal {
                         return self.parser.flush()
                     }
                     step = self.parser.feed(nb)
-                },
+                }
             }
         }
         return InputEvent.Idle
@@ -159,8 +159,8 @@ impl Terminal {
 
     // Raw mode plus the usual full-screen setup: alternate screen, hidden
     // cursor, cleared page. False when stdin is not a terminal.
-    fun setup(self) -> Bool {
-        if !self.raw_on() {
+    fun setup(self) -> bool {
+        if not self.raw_on() {
             return false
         }
         self.alt_on()

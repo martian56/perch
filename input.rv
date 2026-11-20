@@ -4,9 +4,9 @@
 // pending lone ESC. Keeping the decoder free of I/O makes it testable by
 // feeding byte lists.
 
-import std/string
-import "./keys" { Key, MouseKind, MouseEvent, InputEvent }
-import "./sys" { byte_str }
+import std.string
+from "./keys" import Key, MouseKind, MouseEvent, InputEvent
+from "./sys" import byte_str
 
 // What feed reports after each byte.
 enum Step {
@@ -14,24 +14,24 @@ enum Step {
     More,
 }
 
-struct Parser {
-    buf: List<Int>,
+class Parser {
+    buf: list[int]
     // Bracketed paste: between ESC[200~ and ESC[201~ every byte is content,
     // collected in `paste`; `tail` holds a partial match of the terminator.
-    pasting: Bool,
-    paste: List<Int>,
-    tail: List<Int>,
+    pasting: bool
+    paste: list[int]
+    tail: list[int]
 }
 
 impl Parser {
     fun new() -> Parser {
-        let b: List<Int> = []
-        let p: List<Int> = []
-        let t: List<Int> = []
-        return Parser { buf: b, pasting: false, paste: p, tail: t }
+        let b: list[int] = []
+        let p: list[int] = []
+        let t: list[int] = []
+        return Parser(buf: b, pasting: false, paste: p, tail: t)
     }
 
-    fun feed(self, b: Int) -> Step {
+    fun feed(self, b: int) -> Step {
         if self.pasting {
             return self._paste_feed(b)
         }
@@ -52,7 +52,7 @@ impl Parser {
         if self.pasting {
             return InputEvent.Idle
         }
-        let lone_esc = self.buf.len() == 1 && self.buf[0] == 27
+        let lone_esc = self.buf.len() == 1 and self.buf[0] == 27
         self._clear()
         if lone_esc {
             return InputEvent.KeyPress(Key.Esc)
@@ -63,7 +63,7 @@ impl Parser {
     // One byte of paste content. The terminator ESC [ 2 0 1 ~ is matched
     // incrementally through `tail`; on a mismatch the held bytes were real
     // content, so they move into the paste before the byte is reconsidered.
-    fun _paste_feed(self, b: Int) -> Step {
+    fun _paste_feed(self, b: int) -> Step {
         let expected = _paste_end()
         if b == expected[self.tail.len()] {
             self.tail.push(b)
@@ -73,9 +73,9 @@ impl Parser {
             return Step.More
         }
         let held = self.tail
-        let fresh: List<Int> = []
+        let fresh: list[int] = []
         self.tail = fresh
-        let i = 0
+        var i = 0
         while i < held.len() {
             self.paste.push(held[i])
             i = i + 1
@@ -93,13 +93,13 @@ impl Parser {
     // The finished paste as one event, newlines normalized: terminals send
     // \r (or \r\n) for line breaks in pasted text.
     fun _paste_done(self) -> InputEvent {
-        let s = ""
-        let i = 0
+        var s = ""
+        var i = 0
         while i < self.paste.len() {
             let b = self.paste[i]
             if b == 13 {
                 s = s.concat("\n")
-                if i + 1 < self.paste.len() && self.paste[i + 1] == 10 {
+                if i + 1 < self.paste.len() and self.paste[i + 1] == 10 {
                     i = i + 1
                 }
             } else {
@@ -108,34 +108,34 @@ impl Parser {
             i = i + 1
         }
         self.pasting = false
-        let p: List<Int> = []
+        let p: list[int] = []
         self.paste = p
-        let t: List<Int> = []
+        let t: list[int] = []
         self.tail = t
         return InputEvent.Paste(s)
     }
 
     fun _clear(self) {
-        let empty: List<Int> = []
+        let empty: list[int] = []
         self.buf = empty
     }
 
     // First byte of a new sequence.
-    fun _start(self, b: Int) -> Step {
+    fun _start(self, b: int) -> Step {
         if b == 27 {
             self.buf.push(b)
             return Step.More
         }
-        if b == 13 || b == 10 {
+        if b == 13 or b == 10 {
             return Step.Ready(InputEvent.KeyPress(Key.Enter))
         }
         if b == 9 {
             return Step.Ready(InputEvent.KeyPress(Key.Tab))
         }
-        if b == 127 || b == 8 {
+        if b == 127 or b == 8 {
             return Step.Ready(InputEvent.KeyPress(Key.Backspace))
         }
-        if b >= 1 && b <= 26 {
+        if b >= 1 and b <= 26 {
             return Step.Ready(InputEvent.KeyPress(Key.Ctrl(byte_str(b + 96))))
         }
         if b < 32 {
@@ -144,7 +144,7 @@ impl Parser {
         if b < 128 {
             return Step.Ready(InputEvent.KeyPress(Key.Char(byte_str(b))))
         }
-        if b >= 194 && b <= 244 {
+        if b >= 194 and b <= 244 {
             self.buf.push(b)
             return Step.More
         }
@@ -153,9 +153,9 @@ impl Parser {
     }
 
     // Byte after an ESC.
-    fun _escape(self, b: Int) -> Step {
+    fun _escape(self, b: int) -> Step {
         if self.buf.len() == 1 {
-            if b == 91 || b == 79 {
+            if b == 91 or b == 79 {
                 self.buf.push(b)
                 return Step.More
             }
@@ -171,25 +171,25 @@ impl Parser {
     }
 
     // CSI sequence: ESC [ params final.
-    fun _csi(self, b: Int) -> Step {
-        if b >= 64 && b <= 126 {
+    fun _csi(self, b: int) -> Step {
+        if b >= 64 and b <= 126 {
             let params = self._params()
             self._clear()
             if b == 126 {
                 let nums = _numbers(params)
-                if nums.len() > 0 && nums[0] == 200 {
+                if nums.len() > 0 and nums[0] == 200 {
                     // Paste start: everything until ESC[201~ is content.
                     self.pasting = true
                     return Step.More
                 }
-                if nums.len() > 0 && nums[0] == 201 {
+                if nums.len() > 0 and nums[0] == 201 {
                     // A stray paste end with no start; ignore it.
                     return Step.More
                 }
             }
             return Step.Ready(_decode_csi(params, b))
         }
-        if b >= 32 && b <= 63 {
+        if b >= 32 and b <= 63 {
             self.buf.push(b)
             return Step.More
         }
@@ -198,7 +198,7 @@ impl Parser {
     }
 
     // SS3 sequence: ESC O final. F1 to F4 and some navigation keys.
-    fun _ss3(self, b: Int) -> Step {
+    fun _ss3(self, b: int) -> Step {
         self._clear()
         if b == 80 {
             return Step.Ready(InputEvent.KeyPress(Key.F(1)))
@@ -234,8 +234,8 @@ impl Parser {
     }
 
     // Continuation of a UTF-8 character.
-    fun _utf8(self, b: Int) -> Step {
-        if b < 128 || b >= 192 {
+    fun _utf8(self, b: int) -> Step {
+        if b < 128 or b >= 192 {
             // Not a continuation byte; drop the broken lead and start over.
             self._clear()
             return self.feed(b)
@@ -244,8 +244,8 @@ impl Parser {
         if self.buf.len() < _utf8_len(self.buf[0]) {
             return Step.More
         }
-        let s = ""
-        let i = 0
+        var s = ""
+        var i = 0
         while i < self.buf.len() {
             s = s.concat(byte_str(self.buf[i]))
             i = i + 1
@@ -255,9 +255,9 @@ impl Parser {
     }
 
     // The parameter bytes collected so far, without the ESC [ prefix.
-    fun _params(self) -> List<Int> {
-        let out: List<Int> = []
-        let i = 2
+    fun _params(self) -> list[int] {
+        let out: list[int] = []
+        var i = 2
         while i < self.buf.len() {
             out.push(self.buf[i])
             i = i + 1
@@ -267,12 +267,12 @@ impl Parser {
 }
 
 // The paste terminator byte sequence: ESC [ 2 0 1 ~.
-fun _paste_end() -> List<Int> {
+fun _paste_end() -> list[int] {
     return [27, 91, 50, 48, 49, 126]
 }
 
 // Total bytes in a UTF-8 character with this lead byte.
-fun _utf8_len(lead: Int) -> Int {
+fun _utf8_len(lead: int) -> int {
     if lead < 224 {
         return 2
     }
@@ -285,8 +285,8 @@ fun _utf8_len(lead: Int) -> Int {
 // Decode a complete CSI sequence from its parameter bytes and final byte.
 // Modifier parameters (as in ESC [ 1 ; 5 A for Ctrl+Up) are accepted and
 // ignored; the base key comes through.
-fun _decode_csi(params: List<Int>, last: Int) -> InputEvent {
-    if params.len() > 0 && params[0] == 60 {
+fun _decode_csi(params: list[int], last: int) -> InputEvent {
+    if params.len() > 0 and params[0] == 60 {
         return _decode_mouse(params, last)
     }
     if last == 65 {
@@ -319,14 +319,14 @@ fun _decode_csi(params: List<Int>, last: Int) -> InputEvent {
 
 // The numbers in a parameter byte run, split on semicolons. Non-digit bytes
 // such as the SGR mouse marker are skipped.
-fun _numbers(params: List<Int>) -> List<Int> {
-    let out: List<Int> = []
-    let cur = 0
-    let seen = false
-    let i = 0
+fun _numbers(params: list[int]) -> list[int] {
+    let out: list[int] = []
+    var cur = 0
+    var seen = false
+    var i = 0
     while i < params.len() {
         let b = params[i]
-        if b >= 48 && b <= 57 {
+        if b >= 48 and b <= 57 {
             cur = cur * 10 + (b - 48)
             seen = true
         }
@@ -344,12 +344,12 @@ fun _numbers(params: List<Int>) -> List<Int> {
 }
 
 // ESC [ n ~ navigation and function keys.
-fun _decode_tilde(nums: List<Int>) -> InputEvent {
+fun _decode_tilde(nums: list[int]) -> InputEvent {
     if nums.len() == 0 {
         return InputEvent.Idle
     }
     let n = nums[0]
-    if n == 1 || n == 7 {
+    if n == 1 or n == 7 {
         return InputEvent.KeyPress(Key.Home)
     }
     if n == 2 {
@@ -358,7 +358,7 @@ fun _decode_tilde(nums: List<Int>) -> InputEvent {
     if n == 3 {
         return InputEvent.KeyPress(Key.Delete)
     }
-    if n == 4 || n == 8 {
+    if n == 4 or n == 8 {
         return InputEvent.KeyPress(Key.End)
     }
     if n == 5 {
@@ -367,20 +367,20 @@ fun _decode_tilde(nums: List<Int>) -> InputEvent {
     if n == 6 {
         return InputEvent.KeyPress(Key.PageDown)
     }
-    if n >= 11 && n <= 15 {
+    if n >= 11 and n <= 15 {
         return InputEvent.KeyPress(Key.F(n - 10))
     }
-    if n >= 17 && n <= 21 {
+    if n >= 17 and n <= 21 {
         return InputEvent.KeyPress(Key.F(n - 11))
     }
-    if n == 23 || n == 24 {
+    if n == 23 or n == 24 {
         return InputEvent.KeyPress(Key.F(n - 12))
     }
     return InputEvent.Idle
 }
 
 // SGR mouse report: ESC [ < code ; x ; y then M for press, m for release.
-fun _decode_mouse(params: List<Int>, last: Int) -> InputEvent {
+fun _decode_mouse(params: list[int], last: int) -> InputEvent {
     let nums = _numbers(params)
     if nums.len() < 3 {
         return InputEvent.Idle
@@ -388,26 +388,26 @@ fun _decode_mouse(params: List<Int>, last: Int) -> InputEvent {
     let code = nums[0]
     let x = nums[1]
     let y = nums[2]
-    if code >= 64 && code < 96 {
-        let kind = MouseKind.ScrollUp
+    if code >= 64 and code < 96 {
+        var kind = MouseKind.ScrollUp
         if code % 2 == 1 {
             kind = MouseKind.ScrollDown
         }
-        return InputEvent.Mouse(MouseEvent { kind, button: -1, x, y })
+        return InputEvent.Mouse(MouseEvent(kind: kind, button: -1, x: x, y: y))
     }
     let btn = code & 3
     let moving = (code & 32) != 0
     if moving {
         if btn == 3 {
-            return InputEvent.Mouse(MouseEvent { kind: MouseKind.Move, button: -1, x, y })
+            return InputEvent.Mouse(MouseEvent(kind: MouseKind.Move, button: -1, x: x, y: y))
         }
-        return InputEvent.Mouse(MouseEvent { kind: MouseKind.Drag, button: btn, x, y })
+        return InputEvent.Mouse(MouseEvent(kind: MouseKind.Drag, button: btn, x: x, y: y))
     }
     if btn == 3 {
         return InputEvent.Idle
     }
     if last == 109 {
-        return InputEvent.Mouse(MouseEvent { kind: MouseKind.Up, button: btn, x, y })
+        return InputEvent.Mouse(MouseEvent(kind: MouseKind.Up, button: btn, x: x, y: y))
     }
-    return InputEvent.Mouse(MouseEvent { kind: MouseKind.Down, button: btn, x, y })
+    return InputEvent.Mouse(MouseEvent(kind: MouseKind.Down, button: btn, x: x, y: y))
 }

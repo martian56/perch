@@ -1,40 +1,40 @@
 // Run with: rvpm run
 // Interactive: shows each decoded event until q, Esc, or Ctrl+C.
-import std/io { println }
-import std/string
-import "../lib" { Terminal, Size }
-import "../keys" { InputEvent, Key, MouseEvent, MouseKind }
+from std.io import println
+import std.string
+from "../lib" import Terminal, Size
+from "../keys" import InputEvent, Key, MouseEvent, MouseKind
 
-fun describe_key(k: Key) -> String {
+fun describe_key(k: Key) -> str {
     return match k {
-        Char(c) -> "char '${c}'",
-        Enter -> "enter",
-        Tab -> "tab",
-        Backspace -> "backspace",
-        Esc -> "esc",
-        Up -> "up",
-        Down -> "down",
-        Left -> "left",
-        Right -> "right",
-        Home -> "home",
-        End -> "end",
-        PageUp -> "page up",
-        PageDown -> "page down",
-        Insert -> "insert",
-        Delete -> "delete",
-        F(n) -> "F${n}",
-        Ctrl(c) -> "ctrl+${c}",
+        case Char(c) { "char '${c}'" }
+        case Enter { "enter" }
+        case Tab { "tab" }
+        case Backspace { "backspace" }
+        case Esc { "esc" }
+        case Up { "up" }
+        case Down { "down" }
+        case Left { "left" }
+        case Right { "right" }
+        case Home { "home" }
+        case End { "end" }
+        case PageUp { "page up" }
+        case PageDown { "page down" }
+        case Insert { "insert" }
+        case Delete { "delete" }
+        case F(n) { "F${n}" }
+        case Ctrl(c) { "ctrl+${c}" }
     }
 }
 
-fun describe_mouse(m: MouseEvent) -> String {
+fun describe_mouse(m: MouseEvent) -> str {
     let kind = match m.kind {
-        Down -> "down",
-        Up -> "up",
-        Drag -> "drag",
-        Move -> "move",
-        ScrollUp -> "scroll up",
-        ScrollDown -> "scroll down",
+        case Down { "down" }
+        case Up { "up" }
+        case Drag { "drag" }
+        case Move { "move" }
+        case ScrollUp { "scroll up" }
+        case ScrollDown { "scroll down" }
     }
     return "mouse ${kind}, button ${m.button}, at ${m.x},${m.y}"
 }
@@ -43,46 +43,42 @@ fun main() {
     let t = Terminal.new()
     let sz = t.size()
     println("terminal is ${sz.w}x${sz.h}")
-    if !t.raw_on() {
+    if not t.raw_on() {
         println("stdin is not a terminal, nothing to demo")
         return
     }
     t.mouse_on()
     t.paste_on()
     t.write("raw mode on: press keys or click, q or esc quits\r\n")
-    let running = true
+    var running = true
     while running {
         let e = t.read_event(250)
         match e {
-            KeyPress(k) -> {
+            case KeyPress(k) {
                 t.write("${describe_key(k)}\r\n")
                 match k {
-                    Char(c) -> {
+                    case Char(c) {
                         if c == "q" {
                             running = false
                         }
-                    },
-                    Esc -> {
+                    }
+                    case Esc {
                         running = false
-                    },
-                    Ctrl(c) -> {
+                    }
+                    case Ctrl(c) {
                         if c == "c" {
                             running = false
                         }
-                    },
-                    _ -> {},
+                    }
+                    case _ {}
                 }
-            },
-            Mouse(m) -> {
-                t.write("${describe_mouse(m)}\r\n")
-            },
-            Paste(s) -> {
-                t.write("paste (${s.length()} bytes)\r\n")
-            },
-            Idle -> {},
-            Closed -> {
+            }
+            case Mouse(m) { t.write("${describe_mouse(m)}\r\n") }
+            case Paste(s) { t.write("paste (${s.length()} bytes)\r\n") }
+            case Idle {}
+            case Closed {
                 running = false
-            },
+            }
         }
     }
     t.restore()

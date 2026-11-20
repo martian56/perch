@@ -1,6 +1,6 @@
-import std/string
-import std/test { assert_eq_str }
-import "./ansi" { move_to, clear_screen, clear_line, cursor_hide, cursor_show, sgr, sgr_reset }
+import std.string
+from std.test import assert_eq_str
+from "./ansi" import move_to, clear_screen, clear_line, cursor_hide, cursor_show, sgr, sgr_reset
 
 fun test_move_to() {
     assert_eq_str(move_to(1, 1), "\u{1b}[1;1H")
@@ -26,7 +26,7 @@ fun test_sgr_many_codes() {
 }
 
 fun test_sgr_empty_is_empty() {
-    let none: List<Int> = []
+    let none: list[int] = []
     assert_eq_str(sgr(none), "")
 }
 

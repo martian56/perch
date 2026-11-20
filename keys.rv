@@ -3,7 +3,7 @@
 
 // A single key press.
 enum Key {
-    Char(String),
+    Char(str),
     Enter,
     Tab,
     Backspace,
@@ -18,8 +18,8 @@ enum Key {
     PageDown,
     Insert,
     Delete,
-    F(Int),
-    Ctrl(String),
+    F(int),
+    Ctrl(str),
 }
 
 // What the mouse did.
@@ -34,11 +34,11 @@ enum MouseKind {
 
 // A mouse event at a 1-based cell position. Button is 0 for left, 1 for
 // middle, 2 for right, and -1 when no button applies.
-struct MouseEvent {
-    kind: MouseKind,
-    button: Int,
-    x: Int,
-    y: Int,
+class MouseEvent {
+    kind: MouseKind
+    button: int
+    x: int
+    y: int
 }
 
 // What read_event hands back. Idle means the timeout passed with nothing
@@ -48,7 +48,7 @@ struct MouseEvent {
 enum InputEvent {
     KeyPress(Key),
     Mouse(MouseEvent),
-    Paste(String),
+    Paste(str),
     Idle,
     Closed,
 }
