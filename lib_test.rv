@@ -1,5 +1,5 @@
-import std/test { assert_true, assert_false }
-import "./lib" { Terminal, Size }
+from std.test import assert_true, assert_false
+from "./lib" import Terminal, Size
 
 fun test_new_terminal_starts_clean() {
     let t = Terminal.new()

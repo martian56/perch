@@ -16,7 +16,7 @@ useful on its own for menus, key-driven tools, and progress displays.
 
 ```toml
 [dependencies]
-"github.com/martian56/perch" = "v0.2.0"
+"github.com/martian56/perch" = "v0.3.0"
 ```
 
 The package bundles a small C shim (termios and poll on POSIX, the console
@@ -26,33 +26,35 @@ the same one Raven already needs for linking.
 ## Usage
 
 ```rust
-import "github.com/martian56/perch" { Terminal }
-import "github.com/martian56/perch/keys" { InputEvent, Key }
+from "github.com/martian56/perch" import Terminal
+from "github.com/martian56/perch/keys" import InputEvent, Key
 
 fun main() {
     let t = Terminal.new()
-    if !t.raw_on() {
+    if not t.raw_on() {
         print("stdin is not a terminal")
         return
     }
     t.write("press keys, q quits\r\n")
-    let running = true
+    var running = true
     while running {
         match t.read_event(100) {
-            KeyPress(k) -> match k {
-                Char(c) -> {
-                    t.write("you typed ${c}\r\n")
-                    if c == "q" {
-                        running = false
+            case KeyPress(k) {
+                match k {
+                    case Char(c) {
+                        t.write("you typed ${c}\r\n")
+                        if c == "q" {
+                            running = false
+                        }
                     }
-                },
-                Up -> t.write("up\r\n"),
-                _ -> {},
-            },
-            Closed -> {
+                    case Up { t.write("up\r\n") }
+                    case _ {}
+                }
+            }
+            case Closed {
                 running = false
-            },
-            _ -> {},
+            }
+            case _ {}
         }
     }
     t.raw_off()
@@ -64,13 +66,13 @@ fun main() {
 `read_event(timeout_ms)` returns an `InputEvent`:
 
 - `KeyPress(Key)`: one key. `Key` covers printable characters
-  (`Char(String)`, UTF-8 aware), `Enter`, `Tab`, `Backspace`, `Esc`, the
+  (`Char(str)`, UTF-8 aware), `Enter`, `Tab`, `Backspace`, `Esc`, the
   arrows, `Home`, `End`, `PageUp`, `PageDown`, `Insert`, `Delete`,
-  function keys as `F(Int)`, and `Ctrl(String)` combinations.
+  function keys as `F(int)`, and `Ctrl(str)` combinations.
 - `Mouse(MouseEvent)`: kind (`Down`, `Up`, `Drag`, `Move`, `ScrollUp`,
   `ScrollDown`), button, and a 1-based cell position. Call `mouse_on()`
   first.
-- `Paste(String)`: one whole bracketed paste, newlines normalized to
+- `Paste(str)`: one whole bracketed paste, newlines normalized to
   `\n`, so pasted text arrives as a single event instead of a stream of
   keystrokes (and a pasted newline cannot act as Enter). Call
   `paste_on()` first.
@@ -88,13 +90,13 @@ Handling a paste looks like handling any other event:
 ```rust
 t.paste_on()
 match t.read_event(100) {
-    Paste(text) -> {
+    case Paste(text) {
         // One event for the whole paste. text may span many lines; a
         // pasted newline is content here, never an Enter keypress.
         editor.insert(text)
-    },
-    KeyPress(k) -> handle_key(k),
-    _ -> {},
+    }
+    case KeyPress(k) { handle_key(k) }
+    case _ {}
 }
 ```
 

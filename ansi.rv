@@ -1,64 +1,64 @@
 // ANSI escape sequence builders. Pure string construction; write the result
 // through Terminal.write or any other output path.
 
-import std/string
+import std.string
 
 // Move the cursor to a 1-based row and column.
-fun move_to(row: Int, col: Int) -> String {
+fun move_to(row: int, col: int) -> str {
     return "\u{1b}[${row};${col}H"
 }
 
-fun clear_screen() -> String {
+fun clear_screen() -> str {
     return "\u{1b}[2J"
 }
 
-fun clear_line() -> String {
+fun clear_line() -> str {
     return "\u{1b}[2K"
 }
 
-fun cursor_hide() -> String {
+fun cursor_hide() -> str {
     return "\u{1b}[?25l"
 }
 
-fun cursor_show() -> String {
+fun cursor_show() -> str {
     return "\u{1b}[?25h"
 }
 
-fun alt_screen_on() -> String {
+fun alt_screen_on() -> str {
     return "\u{1b}[?1049h"
 }
 
-fun alt_screen_off() -> String {
+fun alt_screen_off() -> str {
     return "\u{1b}[?1049l"
 }
 
 // Button-event tracking plus SGR coordinates, the widely supported pair.
-fun mouse_on() -> String {
+fun mouse_on() -> str {
     return "\u{1b}[?1002h\u{1b}[?1006h"
 }
 
-fun mouse_off() -> String {
+fun mouse_off() -> str {
     return "\u{1b}[?1006l\u{1b}[?1002l"
 }
 
 // Bracketed paste: the terminal wraps pasted text in ESC[200~ .. ESC[201~
 // instead of replaying it as keystrokes.
-fun paste_on() -> String {
+fun paste_on() -> str {
     return "\u{1b}[?2004h"
 }
 
-fun paste_off() -> String {
+fun paste_off() -> str {
     return "\u{1b}[?2004l"
 }
 
 // A Select Graphic Rendition sequence from raw code numbers, so callers can
 // compose styles without depending on any particular style type.
-fun sgr(codes: List<Int>) -> String {
+fun sgr(codes: list[int]) -> str {
     if codes.len() == 0 {
         return ""
     }
-    let body = "${codes[0]}"
-    let i = 1
+    var body = "${codes[0]}"
+    var i = 1
     while i < codes.len() {
         body = "${body};${codes[i]}"
         i = i + 1
@@ -66,6 +66,6 @@ fun sgr(codes: List<Int>) -> String {
     return "\u{1b}[${body}m"
 }
 
-fun sgr_reset() -> String {
+fun sgr_reset() -> str {
     return "\u{1b}[0m"
 }

@@ -1,68 +1,68 @@
-import std/string
-import std/test { assert_eq_str }
-import "./input" { Parser, Step }
-import "./keys" { InputEvent, Key, MouseEvent, MouseKind }
+import std.string
+from std.test import assert_eq_str
+from "./input" import Parser, Step
+from "./keys" import InputEvent, Key, MouseEvent, MouseKind
 
 // Feed a byte list and return the last completed event.
-fun feed_all(p: Parser, bytes: List<Int>) -> InputEvent {
-    let out = InputEvent.Idle
-    let i = 0
+fun feed_all(p: Parser, bytes: list[int]) -> InputEvent {
+    var out = InputEvent.Idle
+    var i = 0
     while i < bytes.len() {
         match p.feed(bytes[i]) {
-            Ready(e) -> {
+            case Ready(e) {
                 out = e
-            },
-            More -> {},
+            }
+            case More {}
         }
         i = i + 1
     }
     return out
 }
 
-fun decode(bytes: List<Int>) -> String {
+fun decode(bytes: list[int]) -> str {
     return event_tag(feed_all(Parser.new(), bytes))
 }
 
-fun event_tag(e: InputEvent) -> String {
+fun event_tag(e: InputEvent) -> str {
     return match e {
-        KeyPress(k) -> "key ${key_tag(k)}",
-        Mouse(m) -> "mouse ${mouse_tag(m)}",
-        Paste(s) -> "paste:${s}",
-        Idle -> "idle",
-        Closed -> "closed",
+        case KeyPress(k) { "key ${key_tag(k)}" }
+        case Mouse(m) { "mouse ${mouse_tag(m)}" }
+        case Paste(s) { "paste:${s}" }
+        case Idle { "idle" }
+        case Closed { "closed" }
     }
 }
 
-fun key_tag(k: Key) -> String {
+fun key_tag(k: Key) -> str {
     return match k {
-        Char(c) -> "char:${c}",
-        Enter -> "enter",
-        Tab -> "tab",
-        Backspace -> "backspace",
-        Esc -> "esc",
-        Up -> "up",
-        Down -> "down",
-        Left -> "left",
-        Right -> "right",
-        Home -> "home",
-        End -> "end",
-        PageUp -> "pgup",
-        PageDown -> "pgdn",
-        Insert -> "insert",
-        Delete -> "delete",
-        F(n) -> "f${n}",
-        Ctrl(c) -> "ctrl:${c}",
+        case Char(c) { "char:${c}" }
+        case Enter { "enter" }
+        case Tab { "tab" }
+        case Backspace { "backspace" }
+        case Esc { "esc" }
+        case Up { "up" }
+        case Down { "down" }
+        case Left { "left" }
+        case Right { "right" }
+        case Home { "home" }
+        case End { "end" }
+        case PageUp { "pgup" }
+        case PageDown { "pgdn" }
+        case Insert { "insert" }
+        case Delete { "delete" }
+        case F(n) { "f${n}" }
+        case Ctrl(c) { "ctrl:${c}" }
     }
 }
 
-fun mouse_tag(m: MouseEvent) -> String {
+fun mouse_tag(m: MouseEvent) -> str {
     let kind = match m.kind {
-        Down -> "down",
-        Up -> "up",
-        Drag -> "drag",
-        Move -> "move",
-        ScrollUp -> "scrollup",
-        ScrollDown -> "scrolldown",
+        case Down { "down" }
+        case Up { "up" }
+        case Drag { "drag" }
+        case Move { "move" }
+        case ScrollUp { "scrollup" }
+        case ScrollDown { "scrolldown" }
     }
     return "${kind} b${m.button} ${m.x},${m.y}"
 }
@@ -101,10 +101,8 @@ fun test_ctrl_letter() {
 fun test_lone_esc_settles_on_flush() {
     let p = Parser.new()
     match p.feed(27) {
-        Ready(e) -> {
-            assert_eq_str("premature", "event")
-        },
-        More -> {},
+        case Ready(e) { assert_eq_str("premature", "event") }
+        case More {}
     }
     assert_eq_str(event_tag(p.flush()), "key esc")
 }
