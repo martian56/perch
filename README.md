@@ -16,7 +16,7 @@ useful on its own for menus, key-driven tools, and progress displays.
 
 ```toml
 [dependencies]
-"github.com/martian56/perch" = "v0.2.0"
+"github.com/martian56/perch" = "v0.3.0"
 ```
 
 The package bundles a small C shim (termios and poll on POSIX, the console
