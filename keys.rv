@@ -20,6 +20,9 @@ enum Key {
     Delete,
     F(int),
     Ctrl(str),
+    // A key with modifiers the variants above cannot carry, named like
+    // "shift+up", "ctrl+right", "ctrl+shift+left", "shift+tab", "ctrl+delete".
+    Mod(str),
 }
 
 // What the mouse did.
@@ -39,6 +42,8 @@ class MouseEvent {
     button: int
     x: int
     y: int
+    // Held modifiers as bits: 1 shift, 2 alt, 4 ctrl.
+    mods: int = 0
 }
 
 // What read_event hands back. Idle means the timeout passed with nothing

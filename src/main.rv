@@ -24,6 +24,7 @@ fun describe_key(k: Key) -> str {
         case Delete { "delete" }
         case F(n) { "F${n}" }
         case Ctrl(c) { "ctrl+${c}" }
+        case Mod(m) { m }
     }
 }
 
