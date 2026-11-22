@@ -283,12 +283,63 @@ fun _utf8_len(lead: int) -> int {
 }
 
 // Decode a complete CSI sequence from its parameter bytes and final byte.
-// Modifier parameters (as in ESC [ 1 ; 5 A for Ctrl+Up) are accepted and
-// ignored; the base key comes through.
+// A modifier parameter (ESC [ 1 ; 5 A is Ctrl+Up, ESC [ 3 ; 2 ~ is
+// Shift+Delete) turns the key into `Key.Mod("ctrl+up")` and the like.
 fun _decode_csi(params: list[int], last: int) -> InputEvent {
     if params.len() > 0 and params[0] == 60 {
         return _decode_mouse(params, last)
     }
+    if last == 90 {
+        return InputEvent.KeyPress(Key.Mod("shift+tab"))
+    }
+    let base = _decode_csi_base(params, last)
+    let nums = _numbers(params)
+    if nums.len() >= 2 and nums[1] >= 2 {
+        return _with_mods(base, nums[1])
+    }
+    return base
+}
+
+// The xterm modifier parameter is 1 + a bit set: 1 shift, 2 alt, 4 ctrl.
+fun _with_mods(ev: InputEvent, param: int) -> InputEvent {
+    let bits = param - 1
+    var prefix = ""
+    if bits & 4 != 0 {
+        prefix = prefix.concat("ctrl+")
+    }
+    if bits & 2 != 0 {
+        prefix = prefix.concat("alt+")
+    }
+    if bits & 1 != 0 {
+        prefix = prefix.concat("shift+")
+    }
+    return match ev {
+        case KeyPress(k) {
+            let name = _key_label(k)
+            InputEvent.KeyPress(Key.Mod(prefix.concat(name))) if name != "" else ev
+        }
+        case _ { ev }
+    }
+}
+
+fun _key_label(k: Key) -> str {
+    return match k {
+        case Up { "up" }
+        case Down { "down" }
+        case Left { "left" }
+        case Right { "right" }
+        case Home { "home" }
+        case End { "end" }
+        case PageUp { "pageup" }
+        case PageDown { "pagedown" }
+        case Insert { "insert" }
+        case Delete { "delete" }
+        case F(n) { "f".concat(n.to_string()) }
+        case _ { "" }
+    }
+}
+
+fun _decode_csi_base(params: list[int], last: int) -> InputEvent {
     if last == 65 {
         return InputEvent.KeyPress(Key.Up)
     }
@@ -306,10 +357,6 @@ fun _decode_csi(params: list[int], last: int) -> InputEvent {
     }
     if last == 70 {
         return InputEvent.KeyPress(Key.End)
-    }
-    if last == 90 {
-        // Shift+Tab reports as plain Tab for now.
-        return InputEvent.KeyPress(Key.Tab)
     }
     if last == 126 {
         return _decode_tilde(_numbers(params))
@@ -388,26 +435,27 @@ fun _decode_mouse(params: list[int], last: int) -> InputEvent {
     let code = nums[0]
     let x = nums[1]
     let y = nums[2]
+    let mods = (code >> 2) & 7
     if code >= 64 and code < 96 {
         var kind = MouseKind.ScrollUp
         if code % 2 == 1 {
             kind = MouseKind.ScrollDown
         }
-        return InputEvent.Mouse(MouseEvent(kind: kind, button: -1, x: x, y: y))
+        return InputEvent.Mouse(MouseEvent(kind: kind, button: -1, x: x, y: y, mods: mods))
     }
     let btn = code & 3
     let moving = (code & 32) != 0
     if moving {
         if btn == 3 {
-            return InputEvent.Mouse(MouseEvent(kind: MouseKind.Move, button: -1, x: x, y: y))
+            return InputEvent.Mouse(MouseEvent(kind: MouseKind.Move, button: -1, x: x, y: y, mods: mods))
         }
-        return InputEvent.Mouse(MouseEvent(kind: MouseKind.Drag, button: btn, x: x, y: y))
+        return InputEvent.Mouse(MouseEvent(kind: MouseKind.Drag, button: btn, x: x, y: y, mods: mods))
     }
     if btn == 3 {
         return InputEvent.Idle
     }
     if last == 109 {
-        return InputEvent.Mouse(MouseEvent(kind: MouseKind.Up, button: btn, x: x, y: y))
+        return InputEvent.Mouse(MouseEvent(kind: MouseKind.Up, button: btn, x: x, y: y, mods: mods))
     }
-    return InputEvent.Mouse(MouseEvent(kind: MouseKind.Down, button: btn, x: x, y: y))
+    return InputEvent.Mouse(MouseEvent(kind: MouseKind.Down, button: btn, x: x, y: y, mods: mods))
 }

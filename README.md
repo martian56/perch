@@ -16,7 +16,7 @@ useful on its own for menus, key-driven tools, and progress displays.
 
 ```toml
 [dependencies]
-"github.com/martian56/perch" = "v0.3.0"
+"github.com/martian56/perch" = "v0.4.0"
 ```
 
 The package bundles a small C shim (termios and poll on POSIX, the console
@@ -68,9 +68,12 @@ fun main() {
 - `KeyPress(Key)`: one key. `Key` covers printable characters
   (`Char(str)`, UTF-8 aware), `Enter`, `Tab`, `Backspace`, `Esc`, the
   arrows, `Home`, `End`, `PageUp`, `PageDown`, `Insert`, `Delete`,
-  function keys as `F(int)`, and `Ctrl(str)` combinations.
+  function keys as `F(int)`, `Ctrl(str)` combinations, and `Mod(str)` for a
+  named key with modifiers: `"shift+up"`, `"ctrl+right"`,
+  `"ctrl+shift+left"`, `"ctrl+delete"`, `"alt+home"`, `"shift+tab"`.
 - `Mouse(MouseEvent)`: kind (`Down`, `Up`, `Drag`, `Move`, `ScrollUp`,
-  `ScrollDown`), button, and a 1-based cell position. Call `mouse_on()`
+  `ScrollDown`), button, a 1-based cell position, and `mods` (bits: 1
+  shift, 2 alt, 4 ctrl) for shift-click and the like. Call `mouse_on()`
   first.
 - `Paste(str)`: one whole bracketed paste, newlines normalized to
   `\n`, so pasted text arrives as a single event instead of a stream of
