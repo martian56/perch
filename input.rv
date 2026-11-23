@@ -435,12 +435,16 @@ fun _decode_mouse(params: list[int], last: int) -> InputEvent {
     let code = nums[0]
     let x = nums[1]
     let y = nums[2]
-    let mods = (code >> 2) & 7
+    var mods = (code >> 2) & 7
     if code >= 64 and code < 96 {
-        var kind = MouseKind.ScrollUp
-        if code % 2 == 1 {
-            kind = MouseKind.ScrollDown
+        // The low bits are the wheel direction: 0 up, 1 down, 2 left, 3 right.
+        // Sideways scrolling arrives as up (left) or down (right) with shift
+        // held, the usual gesture for scrolling sideways.
+        let dir = code & 3
+        if dir >= 2 {
+            mods = mods | 1
         }
+        let kind = MouseKind.ScrollDown if dir % 2 == 1 else MouseKind.ScrollUp
         return InputEvent.Mouse(MouseEvent(kind: kind, button: -1, x: x, y: y, mods: mods))
     }
     let btn = code & 3
