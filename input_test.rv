@@ -162,10 +162,6 @@ fun test_modified_keys() {
     assert_eq_str(decode([27, 91, 49, 59, 49, 65]), "key up")
 }
 
-fun test_alt_char_decodes_as_char() {
-    assert_eq_str(decode([27, 120]), "key char:x")
-}
-
 fun test_mouse_press() {
     // ESC [ < 0 ; 10 ; 5 M
     assert_eq_str(decode([27, 91, 60, 48, 59, 49, 48, 59, 53, 77]), "mouse down b0 10,5")
@@ -289,4 +285,11 @@ fun test_mouse_modifiers() {
         case Mouse(m) { assert_eq_str("${m.mods}", "4") }
         case _ { assert_eq_str("not a mouse event", "mouse") }
     }
+}
+
+fun test_alt_letter() {
+    assert_eq_str(decode([27, 120]), "key mod:alt+x")
+    assert_eq_str(decode([27, 49]), "key mod:alt+1")
+    // ESC then Enter is not Alt: the Enter arrives on its own.
+    assert_eq_str(decode([27, 13]), "key enter")
 }

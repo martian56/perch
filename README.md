@@ -70,7 +70,10 @@ fun main() {
   arrows, `Home`, `End`, `PageUp`, `PageDown`, `Insert`, `Delete`,
   function keys as `F(int)`, `Ctrl(str)` combinations, and `Mod(str)` for a
   named key with modifiers: `"shift+up"`, `"ctrl+right"`,
-  `"ctrl+shift+left"`, `"ctrl+delete"`, `"alt+home"`, `"shift+tab"`.
+  `"ctrl+shift+left"`, `"ctrl+delete"`, `"alt+home"`, `"shift+tab"`, and
+  Alt with a printable key, `"alt+x"` (ESC and the key in one read; an Esc
+  pressed on its own settles on the read timeout). A sideways wheel arrives
+  as `ScrollUp`/`ScrollDown` with the shift bit set.
 - `Mouse(MouseEvent)`: kind (`Down`, `Up`, `Drag`, `Move`, `ScrollUp`,
   `ScrollDown`), button, a 1-based cell position, and `mods` (bits: 1
   shift, 2 alt, 4 ctrl) for shift-click and the like. Call `mouse_on()`
@@ -156,7 +159,6 @@ in Windows Terminal and modern conhost.
 
 ## Rough edges, by design
 
-- Alt+key currently decodes as the plain key; Shift+Tab decodes as `Tab`.
 - Modifier prefixes on arrows and navigation keys (Ctrl+Up and similar) are
   accepted and stripped to the base key.
 - Mouse reporting depends on the emulator. Windows Terminal, and every
