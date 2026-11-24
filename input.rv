@@ -159,8 +159,14 @@ impl Parser {
                 self.buf.push(b)
                 return Step.More
             }
-            // Alt+key or a stray ESC before a plain byte: decode the byte
-            // on its own.
+            // ESC before a printable byte in the same read is Alt+key: a
+            // terminal sends both at once, while an Esc pressed on its own
+            // settles on the read timeout (see flush).
+            if b > 32 and b < 127 {
+                self._clear()
+                return Step.Ready(InputEvent.KeyPress(Key.Mod("alt+".concat(byte_str(b)))))
+            }
+            // A stray ESC before anything else: decode the byte on its own.
             self._clear()
             return self.feed(b)
         }
